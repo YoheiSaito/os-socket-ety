@@ -12,8 +12,12 @@ int main(int argc, char *argv[]){
 	int sock;
 	FILE *f;
 	char buf[1024];
-
-	sock = open_connection((argc>1 ? argv[1]:"localhost"), "daytime");
+	char* port;
+	if(argc == 3)
+		port = argv[2];
+	else
+		port = "daytime";
+	sock = open_connection((argc>1 ? argv[1]:"localhost"), port);
 	f = fdopen(sock, "r");
 	if(!f){
 		perror("fdopen(3)");
