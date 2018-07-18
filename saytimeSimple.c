@@ -12,7 +12,12 @@ int main(int argc, char *argv[]){
 	int sock;
 	FILE *f;
 	char buf[1024];
+	char* port;
 
+	if(argc == 3)
+		port = argv[2];
+	else
+		port = "daytime";
 	sock = open_connection((argc>1 ? argv[1]:"localhost"), "daytime");
 	f = fdopen(sock, "r");
 	if(!f){
@@ -26,7 +31,7 @@ int main(int argc, char *argv[]){
 }
 
 static int open_connection(char *host, char *service){
-	iint sock;
+	int sock;
 	struct addrinfo hints, *res, *ai;
 	int err;
 
