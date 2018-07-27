@@ -33,64 +33,33 @@
 
 #define DEFAULT_PORT 7
 
-static const char* caw = 
-"    \\   ^__^\n\
-     \\  (oo)\\_______\n\
-        (__)\\       )\\/\\\n\
-             ||----w |\n\
-             ||     ||\n";
-
 static int listen_socket(int port);
-void communicate(int sock){
-	while(1){
-		char get_string[1024] = "";
-		int rec_size=0;
-		int n;
-		rec_size = recv(sock, get_string, 128, 0);
-		get_string[rec_size - 2] = '\0';
-		n = rec_size;
-		if(rec_size == 0) break;
-		else if(rec_size == -1){
-			perror("recieve error");
-			exit(EXIT_FAILURE);
-		}else{
-			int i;
-			char* bar;
-			bar = (char *) malloc(n+4);
-			bar[0] = ' ';
-			bar[1] = ' ';
-			char send_str[512] = "";
-			for(i = 0; i < n; i++)
-				bar[i+2] = '-';
-			strcat(bar, "\r\n");
-
-			strcat(send_str, bar);
-			strcat(send_str, " < ");
-			strcat(send_str, get_string);
-			strcat(send_str, " >\r\n");
-			strcat(send_str, bar);
-			strcat(send_str, caw);
-			write(sock, send_str, sizeof(send_str));
-		}
-	}
-	close(sock);
-}
+static void echo(int sock, char opt[]);
+static void do_command(char* cmd, char *res);
 int main(int argc, char * argv[]){
+	int i;
+	int sock, server;
+	char opt[128];
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof addr;
-	int sock, server;
 	server = listen_socket(argc > 1? atoi(argv[1]): DEFAULT_PORT);
-start:
-	sock = accept(server, (struct sockaddr*)&addr, &addrlen);
-	if(sock <0){
-		perror("accept(2)");
-		exit(1);
+	
+	for(i = 2; i < argc; i++){
+		strcat(opt, " ");
+		strcat(opt, argv[i]);
 	}
-	if(fork()==0){
-		communicate(sock);
-	}else{
-		close(sock);
-		goto start;
+	while(1){
+		sock = accept(server, (struct sockaddr*)&addr, &addrlen);
+		if(sock <0){
+			perror("accept(2)");
+			exit(1);
+		}
+		if(fork()==0){
+			echo(sock, opt);
+			exit(0);
+		}else{
+			close(sock);
+		}
 	}
 	close(server);
 	exit(0);
@@ -131,4 +100,46 @@ static int listen_socket(int port){
 	}
 	fprintf(stderr, "cannot listen socket\n");
 	exit(1);
+}
+
+static void do_command(char *command, char *msg){
+	int i;
+	FILE *fp;
+	char c;
+	if((fp=popen(command, "r")) == NULL){
+		perror("cowsay is not be able to execute");
+		exit(EXIT_FAILURE);
+	}
+	for(i = 0; (c = getc(fp)) != EOF ; i++){
+		msg[i] = c;
+	}
+	fclose(fp);
+} 
+
+static void echo(int sock, char opt[]){
+	while(1){
+		char get_string[64] = "", *it;
+		int i, rec_size=0;
+		rec_size = recv(sock, get_string, 128, 0);
+		if(rec_size == 0) break;
+		else if(rec_size == -1){
+			perror("recieve error");
+			exit(EXIT_FAILURE);
+		}else{
+			printf("%s", get_string);
+			char say[128] = "", msg[512]="", cmd[256+20]="";
+			for(i = 0, it = get_string; *it != '\0'; it++){
+				if(*it == '$'||*it == '`' || *it == '"' || *it == '\\')
+					say[i++] = '\\';
+				say[i++] = *it;
+			} 
+			strcat(cmd, "/usr/games/cowsay \" ");
+			strcat(cmd, say);
+			strcat(cmd, " \"");
+			strcat(cmd, opt);
+			do_command(cmd, msg);
+			write(sock, msg, sizeof(msg));
+		}
+	}
+	close(sock);
 }
