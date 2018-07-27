@@ -34,26 +34,16 @@
 #define DEFAULT_PORT 7
 
 static const char* caw = 
-"        \\   ^__^\n\
-         \\  (oo)\\_______\n\
-            (__)\\       )\\/\\\n\
-                  ||----w |\n\
-                  ||     ||\n";
+"    \\   ^__^\n\
+     \\  (oo)\\_______\n\
+        (__)\\       )\\/\\\n\
+             ||----w |\n\
+             ||     ||\n";
 
 static int listen_socket(int port);
-int main(int argc, char * argv[]){
-	struct sockaddr_storage addr;
-	socklen_t addrlen = sizeof addr;
-	int sock, server;
-
-	server = listen_socket(argc > 1? atoi(argv[1]): DEFAULT_PORT);
-	sock = accept(server, (struct sockaddr*)&addr, &addrlen);
-	if(sock <0){
-		perror("accept(2)");
-		exit(1);
-	}
+void communicate(int sock){
 	while(1){
-		char get_string[50] = "";
+		char get_string[1024] = "";
 		int rec_size=0;
 		int n;
 		rec_size = recv(sock, get_string, 128, 0);
@@ -65,25 +55,43 @@ int main(int argc, char * argv[]){
 			exit(EXIT_FAILURE);
 		}else{
 			int i;
-			char bar[30] = "  ";
+			char* bar;
+			bar = (char *) malloc(n+4);
+			bar[0] = ' ';
+			bar[1] = ' ';
 			char send_str[512] = "";
 			for(i = 0; i < n; i++)
 				bar[i+2] = '-';
 			strcat(bar, "\r\n");
-			
+
 			strcat(send_str, bar);
 			strcat(send_str, " < ");
 			strcat(send_str, get_string);
 			strcat(send_str, " >\r\n");
 			strcat(send_str, bar);
 			strcat(send_str, caw);
-			//write(sock, send_str, sizeof(send_str));
-			printf("%s", send_str);
-			write(sock, get_string, sizeof(get_string));
+			write(sock, send_str, sizeof(send_str));
 		}
 	}
-	//write(sock, timestr, strlen(timestr));
 	close(sock);
+}
+int main(int argc, char * argv[]){
+	struct sockaddr_storage addr;
+	socklen_t addrlen = sizeof addr;
+	int sock, server;
+	server = listen_socket(argc > 1? atoi(argv[1]): DEFAULT_PORT);
+start:
+	sock = accept(server, (struct sockaddr*)&addr, &addrlen);
+	if(sock <0){
+		perror("accept(2)");
+		exit(1);
+	}
+	if(fork()==0){
+		communicate(sock);
+	}else{
+		close(sock);
+		goto start;
+	}
 	close(server);
 	exit(0);
 }
